@@ -13,7 +13,7 @@ namespace PrintScreener
 {
     public partial class MainForm : Form
     {
-        private string format;
+        //private string format;
 
         private Dictionary<string, string> formatList;
 

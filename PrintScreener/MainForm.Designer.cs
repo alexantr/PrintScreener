@@ -50,6 +50,7 @@
             this.labelQuality = new System.Windows.Forms.Label();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.groupBoxSettings = new System.Windows.Forms.GroupBox();
+            this.buttonOpenFolder = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownInterval)).BeginInit();
             this.groupBoxLog.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownQuality)).BeginInit();
@@ -163,17 +164,17 @@
             // checkBoxAutoCapture
             // 
             this.checkBoxAutoCapture.AutoSize = true;
-            this.checkBoxAutoCapture.Location = new System.Drawing.Point(9, 130);
+            this.checkBoxAutoCapture.Location = new System.Drawing.Point(223, 242);
             this.checkBoxAutoCapture.Name = "checkBoxAutoCapture";
             this.checkBoxAutoCapture.Size = new System.Drawing.Size(167, 17);
-            this.checkBoxAutoCapture.TabIndex = 12;
+            this.checkBoxAutoCapture.TabIndex = 3;
             this.checkBoxAutoCapture.Text = "Capture PrintScreen button";
             this.checkBoxAutoCapture.UseVisualStyleBackColor = true;
             // 
             // groupBoxLog
             // 
             this.groupBoxLog.Controls.Add(this.richTextBoxLog);
-            this.groupBoxLog.Location = new System.Drawing.Point(8, 168);
+            this.groupBoxLog.Location = new System.Drawing.Point(8, 146);
             this.groupBoxLog.Name = "groupBoxLog";
             this.groupBoxLog.Padding = new System.Windows.Forms.Padding(0);
             this.groupBoxLog.Size = new System.Drawing.Size(382, 90);
@@ -186,7 +187,7 @@
             this.buttonStop.Location = new System.Drawing.Point(89, 270);
             this.buttonStop.Name = "buttonStop";
             this.buttonStop.Size = new System.Drawing.Size(75, 25);
-            this.buttonStop.TabIndex = 3;
+            this.buttonStop.TabIndex = 5;
             this.buttonStop.Text = "Stop";
             this.toolTip.SetToolTip(this.buttonStop, "Stop auto capturing");
             this.buttonStop.UseVisualStyleBackColor = true;
@@ -197,7 +198,7 @@
             this.buttonStart.Location = new System.Drawing.Point(8, 270);
             this.buttonStart.Name = "buttonStart";
             this.buttonStart.Size = new System.Drawing.Size(75, 25);
-            this.buttonStart.TabIndex = 2;
+            this.buttonStart.TabIndex = 4;
             this.buttonStart.Text = "Start";
             this.toolTip.SetToolTip(this.buttonStart, "Start auto capturing");
             this.buttonStart.UseVisualStyleBackColor = true;
@@ -215,10 +216,10 @@
             // checkBoxHideWindow
             // 
             this.checkBoxHideWindow.AutoSize = true;
-            this.checkBoxHideWindow.Location = new System.Drawing.Point(225, 275);
+            this.checkBoxHideWindow.Location = new System.Drawing.Point(9, 242);
             this.checkBoxHideWindow.Name = "checkBoxHideWindow";
             this.checkBoxHideWindow.Size = new System.Drawing.Size(165, 17);
-            this.checkBoxHideWindow.TabIndex = 4;
+            this.checkBoxHideWindow.TabIndex = 2;
             this.checkBoxHideWindow.Text = "Hide window after starting";
             this.toolTip.SetToolTip(this.checkBoxHideWindow, "Hide window when auto capturing is started");
             this.checkBoxHideWindow.UseVisualStyleBackColor = true;
@@ -263,13 +264,23 @@
             this.groupBoxSettings.Controls.Add(this.labelInterval);
             this.groupBoxSettings.Controls.Add(this.numericUpDownInterval);
             this.groupBoxSettings.Controls.Add(this.labelSeconds);
-            this.groupBoxSettings.Controls.Add(this.checkBoxAutoCapture);
             this.groupBoxSettings.Location = new System.Drawing.Point(8, 8);
             this.groupBoxSettings.Name = "groupBoxSettings";
-            this.groupBoxSettings.Size = new System.Drawing.Size(382, 154);
+            this.groupBoxSettings.Size = new System.Drawing.Size(382, 132);
             this.groupBoxSettings.TabIndex = 0;
             this.groupBoxSettings.TabStop = false;
             this.groupBoxSettings.Text = "Settings";
+            // 
+            // buttonOpenFolder
+            // 
+            this.buttonOpenFolder.Location = new System.Drawing.Point(300, 270);
+            this.buttonOpenFolder.Name = "buttonOpenFolder";
+            this.buttonOpenFolder.Size = new System.Drawing.Size(90, 25);
+            this.buttonOpenFolder.TabIndex = 6;
+            this.buttonOpenFolder.Text = "Open folder";
+            this.toolTip.SetToolTip(this.buttonOpenFolder, "Open output folder");
+            this.buttonOpenFolder.UseVisualStyleBackColor = true;
+            this.buttonOpenFolder.Click += new System.EventHandler(this.buttonOpenFolder_Click);
             // 
             // MainForm
             // 
@@ -278,9 +289,11 @@
             this.ClientSize = new System.Drawing.Size(398, 303);
             this.Controls.Add(this.groupBoxSettings);
             this.Controls.Add(this.groupBoxLog);
+            this.Controls.Add(this.checkBoxHideWindow);
+            this.Controls.Add(this.checkBoxAutoCapture);
             this.Controls.Add(this.buttonStart);
             this.Controls.Add(this.buttonStop);
-            this.Controls.Add(this.checkBoxHideWindow);
+            this.Controls.Add(this.buttonOpenFolder);
             this.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
@@ -322,6 +335,7 @@
         private System.Windows.Forms.Label labelQuality;
         private System.Windows.Forms.ToolTip toolTip;
         private System.Windows.Forms.GroupBox groupBoxSettings;
+        private System.Windows.Forms.Button buttonOpenFolder;
     }
 }
 

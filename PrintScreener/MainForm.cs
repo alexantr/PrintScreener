@@ -148,6 +148,14 @@ namespace PrintScreener
             UpdateQuality();
         }
 
+        private void buttonOpenFolder_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(textBoxPath.Text) && Directory.Exists(textBoxPath.Text))
+                Process.Start(textBoxPath.Text);
+            else
+                MessageBox.Show("Path not found!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
         private Timer captureTimer;
 
         private void buttonStart_Click(object sender, EventArgs e)
@@ -169,6 +177,8 @@ namespace PrintScreener
             captureTimer.Tick += new EventHandler(captureTimer_Tick);
             captureTimer.Interval = interval * 1000;
             captureTimer.Start();
+
+            //var timer = new System.Threading.Timer((ev) => GetShot(), null, TimeSpan.Zero, TimeSpan.FromSeconds(20));
 
             groupBoxSettings.Enabled = false;
             buttonStop.Enabled = true;

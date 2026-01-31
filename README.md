@@ -2,4 +2,4 @@
 
 Simple screen capturer
 
-![Main window](https://yashkin.by/printscreener/printscreener.png)
+![Main window](https://tmpfiles.xyz/printscreener/printscreener.png)

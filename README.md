@@ -1,5 +1,5 @@
 # PrintScreener
 
-Simple screen capturer
+Automatically take screenshots with any interval.
 
-![Main window](screenshots/printscreener.png)
+![Main window](PrintScreener.png)

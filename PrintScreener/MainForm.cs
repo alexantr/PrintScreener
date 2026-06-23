@@ -64,7 +64,7 @@ public partial class MainForm : Form
             numericInterval.Value = Properties.Settings.Default.Interval;
 
         // checkboxes
-        checkBoxMonitorClipboard.Checked = Properties.Settings.Default.AutoCapture;
+        checkBoxMonitorClipboard.Checked = Properties.Settings.Default.MonitorClipboard;
         checkBoxHideWindow.Checked = Properties.Settings.Default.HideWindow;
 
         // Welcome message
@@ -97,7 +97,7 @@ public partial class MainForm : Form
         Properties.Settings.Default.Name = textBoxName.Text;
         Properties.Settings.Default.Path = textBoxPath.Text;
         Properties.Settings.Default.Interval = Convert.ToInt32(Math.Round(numericInterval.Value, 0));
-        Properties.Settings.Default.AutoCapture = checkBoxMonitorClipboard.Checked;
+        Properties.Settings.Default.MonitorClipboard = checkBoxMonitorClipboard.Checked;
         Properties.Settings.Default.HideWindow = checkBoxHideWindow.Checked;
         Properties.Settings.Default.JpegQuality = Convert.ToInt32(Math.Round(numericQuality.Value, 0));
         Properties.Settings.Default.Save();

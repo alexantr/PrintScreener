@@ -86,12 +86,12 @@ namespace PrintScreener.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool AutoCapture {
+        public bool MonitorClipboard {
             get {
-                return ((bool)(this["AutoCapture"]));
+                return ((bool)(this["MonitorClipboard"]));
             }
             set {
-                this["AutoCapture"] = value;
+                this["MonitorClipboard"] = value;
             }
         }
         

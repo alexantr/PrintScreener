@@ -110,6 +110,7 @@
             // 
             // comboBoxFormat
             // 
+            comboBoxFormat.DropDownStyle = ComboBoxStyle.DropDownList;
             comboBoxFormat.FormattingEnabled = true;
             comboBoxFormat.Location = new Point(133, 104);
             comboBoxFormat.Name = "comboBoxFormat";
@@ -123,7 +124,7 @@
             textBoxName.Name = "textBoxName";
             textBoxName.Size = new Size(401, 31);
             textBoxName.TabIndex = 4;
-            toolTip.SetToolTip(textBoxName, "Use %date% and %time% which will be replaced with current date and time");
+            toolTip.SetToolTip(textBoxName, "Placeholders %date%, %time% and %num% will be replaced with current date, time and image counter");
             // 
             // buttonBrowse
             // 
@@ -217,6 +218,7 @@
             richTextBoxLog.Size = new Size(582, 150);
             richTextBoxLog.TabIndex = 0;
             richTextBoxLog.Text = "";
+            richTextBoxLog.TextChanged += LogTextChanged;
             // 
             // checkBoxHideWindow
             // 

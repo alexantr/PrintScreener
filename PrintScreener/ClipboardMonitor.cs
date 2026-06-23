@@ -28,18 +28,19 @@ internal partial class ClipboardMonitor : Form
 
     protected override void WndProc(ref Message m)
     {
-        switch (m.Msg)
+        // https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-drawclipboard
+        if (m.Msg == WM_DRAWCLIPBOARD)
         {
-            case WM_DRAWCLIPBOARD:
-                ClipboardChanged?.Invoke(this, EventArgs.Empty);
+            ClipboardChanged?.Invoke(this, EventArgs.Empty);
+            SendMessage(nextClipboardViewer, m.Msg, m.WParam, m.LParam);
+        }
+        // https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-changecbchain
+        else if (m.Msg == WM_CHANGECBCHAIN)
+        {
+            if (m.WParam == nextClipboardViewer)
+                nextClipboardViewer = m.LParam;
+            else
                 SendMessage(nextClipboardViewer, m.Msg, m.WParam, m.LParam);
-                break;
-            case WM_CHANGECBCHAIN:
-                if (m.WParam == nextClipboardViewer)
-                    nextClipboardViewer = m.LParam;
-                else
-                    SendMessage(nextClipboardViewer, m.Msg, m.WParam, m.LParam);
-                break;
         }
 
         base.WndProc(ref m);

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using Timer = System.Windows.Forms.Timer;
 
 namespace PrintScreener;
@@ -8,20 +9,26 @@ public partial class MainForm : Form
 {
     private readonly ClipboardMonitor clipboardMonitor;
 
-    private ImageFormat fileFormat = ImageFormat.Png;
-
     private readonly char[] invalidChars;
 
-    private readonly List<string> formatList;
+    private ImageFormat imageFormat = ImageFormat.Jpeg; // first in formatList
+
+    private readonly List<string> formatList = ["jpg", "png", "gif", "bmp"];
 
     private Timer? captureTimer;
+
+    private int numCounter = 1;
+
+    private Bitmap? prevImage;
+
+    [LibraryImport("msvcrt.dll")]
+    internal static partial int memcmp(IntPtr b1, IntPtr b2, long count);
 
     public MainForm()
     {
         InitializeComponent();
 
         invalidChars = Path.GetInvalidPathChars();
-        formatList = ["jpg", "png", "gif", "bmp"];
 
         clipboardMonitor = new();
     }
@@ -53,7 +60,7 @@ public partial class MainForm : Form
         comboBoxFormat.SelectedIndex = selectedIndex;
 
         // hide/show jpg quality
-        ToggleQuality();
+        ToggleQualityInput();
 
         // jpg quality
         if (Properties.Settings.Default.JpegQuality >= 1 && Properties.Settings.Default.JpegQuality <= 100)
@@ -93,9 +100,9 @@ public partial class MainForm : Form
     private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
     {
         // Save settings
+        Properties.Settings.Default.Path = textBoxPath.Text;
         Properties.Settings.Default.Format = comboBoxFormat.Text;
         Properties.Settings.Default.Name = textBoxName.Text;
-        Properties.Settings.Default.Path = textBoxPath.Text;
         Properties.Settings.Default.Interval = Convert.ToInt32(Math.Round(numericInterval.Value, 0));
         Properties.Settings.Default.MonitorClipboard = checkBoxMonitorClipboard.Checked;
         Properties.Settings.Default.HideWindow = checkBoxHideWindow.Checked;
@@ -120,7 +127,7 @@ public partial class MainForm : Form
 
     private void FormatIndexChanged(object sender, EventArgs e)
     {
-        ToggleQuality();
+        ToggleQualityInput();
     }
 
     private void StartBtnClick(object sender, EventArgs e)
@@ -141,13 +148,7 @@ public partial class MainForm : Form
         if (captureTimer == null)
         {
             captureTimer = new();
-            captureTimer.Tick += (o, args) => {
-                Rectangle bounds = Screen.PrimaryScreen.Bounds;
-                Bitmap image = new(bounds.Width, bounds.Height);
-                using Graphics graphics = Graphics.FromImage(image);
-                graphics.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-                SaveImage(image);
-            };
+            captureTimer.Tick += CaptureTimer_Tick;
         }
         captureTimer.Interval = interval * 1000;
         captureTimer.Start();
@@ -155,6 +156,15 @@ public partial class MainForm : Form
         WriteInLog(string.Format("Start taking screenshots every {0} sec.", interval));
 
         ToggleControls(true);
+    }
+
+    private void CaptureTimer_Tick(object? sender, EventArgs e)
+    {
+        Rectangle bounds = Screen.PrimaryScreen.Bounds;
+        Bitmap image = new(bounds.Width, bounds.Height);
+        using Graphics graphics = Graphics.FromImage(image);
+        graphics.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
+        SaveImage(image);
     }
 
     private void StopBtnClick(object sender, EventArgs e)
@@ -182,6 +192,12 @@ public partial class MainForm : Form
             MessageBox.Show("Folder not found!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 
+    private void LogTextChanged(object sender, EventArgs e)
+    {
+        // manually scroll to bottom cause AppendText doesn't do it if it doesn't have focus
+        ClipboardMonitor.SendMessage(richTextBoxLog.Handle, 0x115, 7, IntPtr.Zero); // 0x115: WM_VSCROLL, 7: SB_BOTTOM
+    }
+
     /// <summary>
     /// Get image full path
     /// </summary>
@@ -201,8 +217,10 @@ public partial class MainForm : Form
             Directory.CreateDirectory(outputPath);
 
         string format = comboBoxFormat.Text;
-        
-        fileFormat = format switch
+        if (formatList.IndexOf(format) == -1)
+            format = "jpg";
+
+        imageFormat = format switch
         {
             "png" => ImageFormat.Png,
             "gif" => ImageFormat.Gif,
@@ -212,6 +230,11 @@ public partial class MainForm : Form
         fileName = fileName
             .Replace("%date%", DateTime.Now.ToString("yyyy-MM-dd"))
             .Replace("%time%", DateTime.Now.ToString("HH-mm-ss"));
+        if (fileName.Contains("%num%"))
+        {
+            fileName = fileName.Replace("%num%", numCounter.ToString());
+            numCounter++;
+        }
 
         string path = Path.Combine(textBoxPath.Text, fileName + "." + format);
 
@@ -234,15 +257,18 @@ public partial class MainForm : Form
         if (image == null)
             return;
 
+        if (CompareBitmapsMemCmp(prevImage, image))
+            return;
+
         try
         {
             string outputFilePath = GetOutputFilePath();
 
-            if (fileFormat == ImageFormat.Jpeg)
+            if (imageFormat == ImageFormat.Jpeg)
             {
-                long quality = Convert.ToInt64(Math.Round(numericQuality.Value, 0));
+                long quality = Convert.ToInt64(numericQuality.Value);
 
-                ImageCodecInfo? jpgEncoder = GetEncoder(fileFormat);
+                ImageCodecInfo? jpgEncoder = GetEncoder(imageFormat);
                 if (jpgEncoder != null)
                 {
                     EncoderParameters encoderParameters = new(1);
@@ -252,14 +278,15 @@ public partial class MainForm : Form
                 }
                 else
                 {
-                    // save jpeg with default quality
-                    image.Save(outputFilePath, fileFormat);
+                    image.Save(outputFilePath, imageFormat);
                 }
             }
             else
             {
-                image.Save(outputFilePath, fileFormat);
+                image.Save(outputFilePath, imageFormat);
             }
+
+            prevImage = image;
 
             WriteInLog(string.Format("\"{0}\" saved.", Path.GetFileName(outputFilePath)));
         }
@@ -279,8 +306,6 @@ public partial class MainForm : Form
         if (newLine)
             richTextBoxLog.AppendText("\n");
         richTextBoxLog.AppendText(string.Format("[{1}] {0}", message, DateTime.Now.ToString("G")));
-        richTextBoxLog.SelectionStart = richTextBoxLog.Text.Length; //Set the current caret position at the end
-        richTextBoxLog.ScrollToCaret(); //Now scroll it automatically
     }
 
     /// <summary>
@@ -300,7 +325,7 @@ public partial class MainForm : Form
         return null;
     }
 
-    private void ToggleQuality()
+    private void ToggleQualityInput()
     {
         bool isJpeg = comboBoxFormat.Text == "jpg";
         labelQuality.Enabled = isJpeg;
@@ -312,5 +337,39 @@ public partial class MainForm : Form
         groupBoxOptions.Enabled = !isRunning;
         buttonStart.Enabled = !isRunning;
         buttonStop.Enabled = isRunning;
+    }
+
+    /// <summary>
+    /// Compare two bitmaps to determine whether they are identical
+    /// https://stackoverflow.com/questions/2031217/
+    /// </summary>
+    /// <param name="b1">Bitmap</param>
+    /// <param name="b2">Bitmap</param>
+    /// <returns>True if two bitmaps are identical</returns>
+    private static bool CompareBitmapsMemCmp(Bitmap? b1, Bitmap? b2)
+    {
+        if (b1 == null || b2 == null)
+            return false;
+        if (b1.Size != b2.Size)
+            return false;
+
+        var bd1 = b1.LockBits(new Rectangle(new Point(0, 0), b1.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        var bd2 = b2.LockBits(new Rectangle(new Point(0, 0), b2.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
+        try
+        {
+            IntPtr bd1scan0 = bd1.Scan0;
+            IntPtr bd2scan0 = bd2.Scan0;
+
+            int stride = bd1.Stride;
+            int len = stride * b1.Height;
+
+            return memcmp(bd1scan0, bd2scan0, len) == 0;
+        }
+        finally
+        {
+            b1.UnlockBits(bd1);
+            b2.UnlockBits(bd2);
+        }
     }
 }

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 using Timer = System.Windows.Forms.Timer;
 
 namespace PrintScreener;
@@ -8,6 +7,12 @@ namespace PrintScreener;
 public partial class MainForm : Form
 {
     private readonly ClipboardMonitor clipboardMonitor;
+    private SelectArea? selectAreaForm;
+
+    private const int WM_VSCROLL = 0x115;
+    private const int SB_BOTTOM = 7;
+
+    private const string defaultName = "Screenshot %date% %time%";
 
     private readonly char[] invalidChars;
 
@@ -15,14 +20,16 @@ public partial class MainForm : Form
 
     private readonly List<string> formatList = ["jpg", "png", "gif", "bmp"];
 
-    private Timer? captureTimer;
+    private bool isRunning = false;
+
+    private readonly Timer captureTimer;
 
     private int numCounter = 1;
 
-    private Bitmap? prevImage;
+    private bool fullScreen = true;
+    private Rectangle area = new(0, 0, 0, 0);
 
-    [LibraryImport("msvcrt.dll")]
-    internal static partial int memcmp(IntPtr b1, IntPtr b2, long count);
+    private Bitmap? prevImage;
 
     public MainForm()
     {
@@ -31,70 +38,90 @@ public partial class MainForm : Form
         invalidChars = Path.GetInvalidPathChars();
 
         clipboardMonitor = new();
+
+        captureTimer = new();
+        captureTimer.Tick += (o, args) => CaptureScreen();
     }
+
+    protected override void WndProc(ref Message m)
+    {
+        const int WM_SYSCOMMAND = 0x112;
+        const int SC_RESTORE = 0xF120;
+
+        if (m.Msg == WM_SYSCOMMAND && (int)m.WParam == SC_RESTORE)
+        {
+            if (isRunning && checkBoxHideWindow.Checked)
+            {
+                StopCapturing();
+            }
+        }
+
+        base.WndProc(ref m);
+    }
+
+    public void SetArea(int x, int y, int w, int h)
+    {
+        fullScreen = false;
+        area.X = x;
+        area.Y = y;
+        area.Width = w;
+        area.Height = h;
+        ToggleCurrentArea();
+    }
+
+    #region Events
 
     private void MainForm_Load(object sender, EventArgs e)
     {
+        var settings = Properties.Settings.Default;
+
         // output path from settings
-        if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.Path) && Directory.Exists(Properties.Settings.Default.Path))
-            textBoxPath.Text = Properties.Settings.Default.Path;
+        if (!string.IsNullOrWhiteSpace(settings.Path) && Directory.Exists(settings.Path))
+            textBoxPath.Text = settings.Path;
         else
             textBoxPath.Text = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
 
         // file name
-        if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.Name) && !invalidChars.Any(Properties.Settings.Default.Name.Contains))
-            textBoxName.Text = Properties.Settings.Default.Name;
+        if (!string.IsNullOrWhiteSpace(settings.Name) && settings.Name.IndexOfAny(invalidChars) == -1)
+            textBoxName.Text = settings.Name;
         else
-            textBoxName.Text = "Screenshot %date% %time%";
+            textBoxName.Text = defaultName;
 
         // file format
-        int index = 0, selectedIndex = 0;
-        comboBoxFormat.Items.Clear();
-        foreach (string oneFormat in formatList)
-        {
-            comboBoxFormat.Items.Add(oneFormat);
-            if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.Format) && oneFormat == Properties.Settings.Default.Format)
-                selectedIndex = index;
-            index++;
-        }
-        comboBoxFormat.SelectedIndex = selectedIndex;
+        Utility.FillComboBox(comboBoxFormat, formatList, settings.Format);
+
+        // jpg quality
+        if (settings.JpegQuality >= 1 && settings.JpegQuality <= 100)
+            numericQuality.Value = settings.JpegQuality;
 
         // hide/show jpg quality
         ToggleQualityInput();
 
-        // jpg quality
-        if (Properties.Settings.Default.JpegQuality >= 1 && Properties.Settings.Default.JpegQuality <= 100)
-            numericQuality.Value = Properties.Settings.Default.JpegQuality;
-
         // interval
-        if (Properties.Settings.Default.Interval > 0 && Properties.Settings.Default.Interval <= 3600)
-            numericInterval.Value = Properties.Settings.Default.Interval;
+        if (settings.Interval >= 1 && settings.Interval <= 3600)
+            numericInterval.Value = settings.Interval;
 
         // checkboxes
-        checkBoxMonitorClipboard.Checked = Properties.Settings.Default.MonitorClipboard;
-        checkBoxHideWindow.Checked = Properties.Settings.Default.HideWindow;
+        checkBoxMonitorClipboard.Checked = settings.MonitorClipboard;
+        checkBoxHideWindow.Checked = settings.HideWindow;
 
-        // Welcome message
-        WriteInLog("PrintScreener is started.", false);
+        // area buttons and text
+        ToggleCurrentArea();
 
         // Monitor Clipboard
         clipboardMonitor.ClipboardChanged += ClipboardMonitor_ClipboardChanged;
+
+        // Welcome message
+        WriteToLog("PrintScreener is started.", false);
     }
 
     private void ClipboardMonitor_ClipboardChanged(object? sender, EventArgs e)
     {
         if (!checkBoxMonitorClipboard.Checked)
             return;
-        if (Clipboard.ContainsImage())
-        {
-            IDataObject? iData = Clipboard.GetDataObject();
-
-            if (iData != null && iData.GetDataPresent(DataFormats.Bitmap))
-            {
-                iData.TryGetData(DataFormats.Bitmap, out Bitmap? image);
-                SaveImage(image);
-            }
-        }
+        var image = Utility.GetBitmapFromClipboard();
+        if (image != null)
+            SaveImage(image);
     }
 
     private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -110,15 +137,31 @@ public partial class MainForm : Form
         Properties.Settings.Default.Save();
     }
 
+    private void SelectAreaBtnClick(object sender, EventArgs e)
+    {
+        Hide();
+        if (selectAreaForm == null || selectAreaForm.IsDisposed)
+            selectAreaForm = new(this);
+        selectAreaForm.Show();
+    }
+
+    private void ResetAreaBtnClick(object sender, EventArgs e)
+    {
+        fullScreen = true;
+        ToggleCurrentArea();
+        buttonSelectArea.Focus();
+    }
+
     private void BrowseBtnClick(object sender, EventArgs e)
     {
         using FolderBrowserDialog dialog = new();
         if (!string.IsNullOrWhiteSpace(textBoxPath.Text) && Directory.Exists(textBoxPath.Text))
             dialog.SelectedPath = textBoxPath.Text;
         else
-            dialog.SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            dialog.SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
 
         dialog.Description = "Select output folder";
+        dialog.UseDescriptionForTitle = true;
         dialog.ShowNewFolderButton = true;
 
         if (dialog.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
@@ -132,7 +175,7 @@ public partial class MainForm : Form
 
     private void StartBtnClick(object sender, EventArgs e)
     {
-        if (captureTimer != null && captureTimer.Enabled)
+        if (captureTimer.Enabled)
             return;
 
         int interval = Convert.ToInt32(Math.Round(numericInterval.Value, 0));
@@ -145,36 +188,20 @@ public partial class MainForm : Form
         if (checkBoxHideWindow.Checked)
             WindowState = FormWindowState.Minimized;
 
-        if (captureTimer == null)
-        {
-            captureTimer = new();
-            captureTimer.Tick += CaptureTimer_Tick;
-        }
-        captureTimer.Interval = interval * 1000;
-        captureTimer.Start();
-
-        WriteInLog(string.Format("Start taking screenshots every {0} sec.", interval));
-
-        ToggleControls(true);
-    }
-
-    private void CaptureTimer_Tick(object? sender, EventArgs e)
-    {
-        Rectangle bounds = Screen.PrimaryScreen.Bounds;
-        Bitmap image = new(bounds.Width, bounds.Height);
-        using Graphics graphics = Graphics.FromImage(image);
-        graphics.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-        SaveImage(image);
+        StartCapturing(interval);
     }
 
     private void StopBtnClick(object sender, EventArgs e)
     {
-        if (captureTimer != null && captureTimer.Enabled)
-        {
-            captureTimer.Stop();
-            WriteInLog("Stop taking screenshots.");
-        }
-        ToggleControls(false);
+        StopCapturing();
+    }
+
+    private async void ShotBtnClick(object sender, EventArgs e)
+    {
+        Opacity = 0;
+        await Task.Delay(200);
+        CaptureScreen();
+        Opacity = 1;
     }
 
     private void OpenFolderBtnClick(object sender, EventArgs e)
@@ -194,23 +221,74 @@ public partial class MainForm : Form
 
     private void LogTextChanged(object sender, EventArgs e)
     {
-        // manually scroll to bottom cause AppendText doesn't do it if it doesn't have focus
-        ClipboardMonitor.SendMessage(richTextBoxLog.Handle, 0x115, 7, IntPtr.Zero); // 0x115: WM_VSCROLL, 7: SB_BOTTOM
+        NativeMethods.SendMessage(richTextBoxLog.Handle, WM_VSCROLL, SB_BOTTOM, IntPtr.Zero);
+    }
+
+    #endregion
+
+    private void CaptureScreen()
+    {
+        var image = fullScreen ? Utility.GetBitmapFromScreen() : Utility.GetBitmapFromScreen(area);
+        if (image != null)
+            SaveImage(image, true);
     }
 
     /// <summary>
-    /// Get image full path
+    /// Save Image to disk
     /// </summary>
-    /// <returns>Image path</returns>
+    /// <param name="image">Bitmap</param>
+    /// <param name="force">Force saving (do not compare images)</param>
+    private void SaveImage(Bitmap image, bool force = false)
+    {
+        if (!force && Utility.CompareBitmapsMemCmp(prevImage, image))
+            return;
+
+        try
+        {
+            string outputFilePath = GetOutputFilePath();
+            string fileName = Path.GetFileName(outputFilePath);
+
+            if (imageFormat == ImageFormat.Jpeg)
+            {
+                long quality = Convert.ToInt64(numericQuality.Value);
+
+                ImageCodecInfo? jpgEncoder = Utility.GetEncoder(imageFormat);
+                if (jpgEncoder != null)
+                {
+                    EncoderParameters encoderParameters = new(1);
+                    encoderParameters.Param[0] = new(Encoder.Quality, quality);
+
+                    image.Save(outputFilePath, jpgEncoder, encoderParameters);
+                }
+                else
+                    image.Save(outputFilePath, imageFormat);
+            }
+            else
+                image.Save(outputFilePath, imageFormat);
+
+            prevImage = image;
+
+            if (File.Exists(outputFilePath))
+                WriteToLog($"\"{fileName}\" saved.");
+            else
+                WriteToLog($"\"{fileName}\" not saved!");
+        }
+        catch (Exception ex)
+        {
+            WriteToLog(ex.Message);
+            StopCapturing();
+        }
+    }
+
     private string GetOutputFilePath()
     {
         string outputPath = textBoxPath.Text;
         string fileName = textBoxName.Text;
 
-        if (string.IsNullOrWhiteSpace(outputPath) || invalidChars.Any(outputPath.Contains))
+        if (string.IsNullOrWhiteSpace(outputPath) || outputPath.IndexOfAny(invalidChars) >= 0)
             throw new Exception("Wrong output folder!");
 
-        if (string.IsNullOrWhiteSpace(fileName) || invalidChars.Any(fileName.Contains))
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.IndexOfAny(invalidChars) >= 0)
             throw new Exception("Wrong file name!");
 
         if (!Directory.Exists(outputPath))
@@ -248,81 +326,33 @@ public partial class MainForm : Form
         return path;
     }
 
-    /// <summary>
-    /// Save Image to disk
-    /// </summary>
-    /// <param name="image">Bitmap</param>
-    private void SaveImage(Bitmap? image)
+    private void StartCapturing(int interval)
     {
-        if (image == null)
-            return;
+        captureTimer.Interval = interval * 1000;
+        captureTimer.Start();
 
-        if (CompareBitmapsMemCmp(prevImage, image))
-            return;
+        isRunning = true;
+        ToggleControls();
 
-        try
-        {
-            string outputFilePath = GetOutputFilePath();
-
-            if (imageFormat == ImageFormat.Jpeg)
-            {
-                long quality = Convert.ToInt64(numericQuality.Value);
-
-                ImageCodecInfo? jpgEncoder = GetEncoder(imageFormat);
-                if (jpgEncoder != null)
-                {
-                    EncoderParameters encoderParameters = new(1);
-                    encoderParameters.Param[0] = new(Encoder.Quality, quality);
-
-                    image.Save(outputFilePath, jpgEncoder, encoderParameters);
-                }
-                else
-                {
-                    image.Save(outputFilePath, imageFormat);
-                }
-            }
-            else
-            {
-                image.Save(outputFilePath, imageFormat);
-            }
-
-            prevImage = image;
-
-            WriteInLog(string.Format("\"{0}\" saved.", Path.GetFileName(outputFilePath)));
-        }
-        catch (Exception ex)
-        {
-            if (captureTimer != null && captureTimer.Enabled)
-            {
-                captureTimer.Stop();
-                ToggleControls(false);
-            }
-            WriteInLog(ex.Message);
-        }
+        WriteToLog($"Start capturing every {interval} sec.");
     }
 
-    private void WriteInLog(string message, bool newLine = true)
+    private void StopCapturing()
+    {
+        if (captureTimer.Enabled)
+        {
+            captureTimer.Stop();
+            WriteToLog("Stop capturing.");
+        }
+        isRunning = false;
+        ToggleControls();
+    }
+
+    private void WriteToLog(string message, bool newLine = true)
     {
         if (newLine)
             richTextBoxLog.AppendText("\n");
         richTextBoxLog.AppendText(string.Format("[{1}] {0}", message, DateTime.Now.ToString("G")));
-    }
-
-    /// <summary>
-    /// Set JPEG Compression Level
-    /// https://learn.microsoft.com/en-us/dotnet/desktop/winforms/advanced/how-to-set-jpeg-compression-level
-    /// </summary>
-    /// <param name="format">ImageFormat</param>
-    /// <returns>ImageCodecInfo</returns>
-    private static ImageCodecInfo? GetEncoder(ImageFormat format)
-    {
-        ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
-        foreach (ImageCodecInfo codec in codecs)
-        {
-            if (codec.FormatID == format.Guid)
-                return codec;
-        }
-        return null;
     }
 
     private void ToggleQualityInput()
@@ -332,44 +362,20 @@ public partial class MainForm : Form
         numericQuality.Enabled = isJpeg;
     }
 
-    private void ToggleControls(bool isRunning)
+    private void ToggleControls()
     {
         groupBoxOptions.Enabled = !isRunning;
+        checkBoxHideWindow.Enabled = !isRunning;
         buttonStart.Enabled = !isRunning;
         buttonStop.Enabled = isRunning;
     }
 
-    /// <summary>
-    /// Compare two bitmaps to determine whether they are identical
-    /// https://stackoverflow.com/questions/2031217/
-    /// </summary>
-    /// <param name="b1">Bitmap</param>
-    /// <param name="b2">Bitmap</param>
-    /// <returns>True if two bitmaps are identical</returns>
-    private static bool CompareBitmapsMemCmp(Bitmap? b1, Bitmap? b2)
+    private void ToggleCurrentArea()
     {
-        if (b1 == null || b2 == null)
-            return false;
-        if (b1.Size != b2.Size)
-            return false;
-
-        var bd1 = b1.LockBits(new Rectangle(new Point(0, 0), b1.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-        var bd2 = b2.LockBits(new Rectangle(new Point(0, 0), b2.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-
-        try
-        {
-            IntPtr bd1scan0 = bd1.Scan0;
-            IntPtr bd2scan0 = bd2.Scan0;
-
-            int stride = bd1.Stride;
-            int len = stride * b1.Height;
-
-            return memcmp(bd1scan0, bd2scan0, len) == 0;
-        }
-        finally
-        {
-            b1.UnlockBits(bd1);
-            b2.UnlockBits(bd2);
-        }
+        buttonResetArea.Enabled = !fullScreen;
+        if (fullScreen)
+            textBoxArea.Text = "Full screen";
+        else
+            textBoxArea.Text = $"{area.X}, {area.Y}, {area.Width}, {area.Height}";
     }
 }

@@ -31,6 +31,9 @@
             components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             groupBoxOptions = new GroupBox();
+            contextMenuOptions = new ContextMenuStrip(components);
+            resetOptionsMenuItem = new ToolStripMenuItem();
+            resetCounterMenuItem = new ToolStripMenuItem();
             textBoxArea = new TextBox();
             buttonResetArea = new Button();
             labelArea = new Label();
@@ -38,7 +41,7 @@
             labelSeconds = new Label();
             numericInterval = new NumericUpDown();
             numericQuality = new NumericUpDown();
-            comboBoxFormat = new ComboBox();
+            comboBoxType = new ComboBox();
             textBoxName = new TextBox();
             buttonBrowse = new Button();
             textBoxPath = new TextBox();
@@ -49,6 +52,9 @@
             labelPath = new Label();
             checkBoxMonitorClipboard = new CheckBox();
             groupBoxLog = new GroupBox();
+            contextMenuLog = new ContextMenuStrip(components);
+            clearLogMenuItem = new ToolStripMenuItem();
+            saveLogMenuItem = new ToolStripMenuItem();
             richTextBoxLog = new RichTextBox();
             checkBoxHideWindow = new CheckBox();
             buttonStart = new Button();
@@ -57,13 +63,16 @@
             toolTip = new ToolTip(components);
             buttonShot = new Button();
             groupBoxOptions.SuspendLayout();
+            contextMenuOptions.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericInterval).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericQuality).BeginInit();
             groupBoxLog.SuspendLayout();
+            contextMenuLog.SuspendLayout();
             SuspendLayout();
             // 
             // groupBoxOptions
             // 
+            groupBoxOptions.ContextMenuStrip = contextMenuOptions;
             groupBoxOptions.Controls.Add(textBoxArea);
             groupBoxOptions.Controls.Add(buttonResetArea);
             groupBoxOptions.Controls.Add(labelArea);
@@ -71,7 +80,7 @@
             groupBoxOptions.Controls.Add(labelSeconds);
             groupBoxOptions.Controls.Add(numericInterval);
             groupBoxOptions.Controls.Add(numericQuality);
-            groupBoxOptions.Controls.Add(comboBoxFormat);
+            groupBoxOptions.Controls.Add(comboBoxType);
             groupBoxOptions.Controls.Add(textBoxName);
             groupBoxOptions.Controls.Add(buttonBrowse);
             groupBoxOptions.Controls.Add(textBoxPath);
@@ -86,6 +95,27 @@
             groupBoxOptions.TabIndex = 0;
             groupBoxOptions.TabStop = false;
             groupBoxOptions.Text = "Options";
+            // 
+            // contextMenuOptions
+            // 
+            contextMenuOptions.ImageScalingSize = new Size(24, 24);
+            contextMenuOptions.Items.AddRange(new ToolStripItem[] { resetOptionsMenuItem, resetCounterMenuItem });
+            contextMenuOptions.Name = "contextMenuOptions";
+            contextMenuOptions.Size = new Size(263, 68);
+            // 
+            // resetOptionsMenuItem
+            // 
+            resetOptionsMenuItem.Name = "resetOptionsMenuItem";
+            resetOptionsMenuItem.Size = new Size(262, 32);
+            resetOptionsMenuItem.Text = "Reset options";
+            resetOptionsMenuItem.Click += ResetOptionsMenuItem_Click;
+            // 
+            // resetCounterMenuItem
+            // 
+            resetCounterMenuItem.Name = "resetCounterMenuItem";
+            resetCounterMenuItem.Size = new Size(262, 32);
+            resetCounterMenuItem.Text = "Reset counter %num%";
+            resetCounterMenuItem.Click += ResetCounterMenuItem_Click;
             // 
             // textBoxArea
             // 
@@ -106,7 +136,7 @@
             buttonResetArea.TabIndex = 15;
             buttonResetArea.Text = "Reset area";
             buttonResetArea.UseVisualStyleBackColor = true;
-            buttonResetArea.Click += ResetAreaBtnClick;
+            buttonResetArea.Click += ResetAreaBtn_Click;
             // 
             // labelArea
             // 
@@ -125,7 +155,7 @@
             buttonSelectArea.TabIndex = 14;
             buttonSelectArea.Text = "Select area";
             buttonSelectArea.UseVisualStyleBackColor = true;
-            buttonSelectArea.Click += SelectAreaBtnClick;
+            buttonSelectArea.Click += SelectAreaBtn_Click;
             // 
             // labelSeconds
             // 
@@ -157,15 +187,15 @@
             toolTip.SetToolTip(numericQuality, "From 1 to 100");
             numericQuality.Value = new decimal(new int[] { 80, 0, 0, 0 });
             // 
-            // comboBoxFormat
+            // comboBoxType
             // 
-            comboBoxFormat.DropDownStyle = ComboBoxStyle.DropDownList;
-            comboBoxFormat.FormattingEnabled = true;
-            comboBoxFormat.Location = new Point(133, 104);
-            comboBoxFormat.Name = "comboBoxFormat";
-            comboBoxFormat.Size = new Size(90, 33);
-            comboBoxFormat.TabIndex = 6;
-            comboBoxFormat.SelectedIndexChanged += FormatIndexChanged;
+            comboBoxType.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboBoxType.FormattingEnabled = true;
+            comboBoxType.Location = new Point(133, 104);
+            comboBoxType.Name = "comboBoxType";
+            comboBoxType.Size = new Size(90, 33);
+            comboBoxType.TabIndex = 6;
+            comboBoxType.SelectedIndexChanged += TypeBox_SelectedIndexChanged;
             // 
             // textBoxName
             // 
@@ -184,7 +214,7 @@
             buttonBrowse.Text = "...";
             toolTip.SetToolTip(buttonBrowse, "Select output folder");
             buttonBrowse.UseVisualStyleBackColor = true;
-            buttonBrowse.Click += BrowseBtnClick;
+            buttonBrowse.Click += BrowseBtn_Click;
             // 
             // textBoxPath
             // 
@@ -251,6 +281,7 @@
             // 
             // groupBoxLog
             // 
+            groupBoxLog.ContextMenuStrip = contextMenuLog;
             groupBoxLog.Controls.Add(richTextBoxLog);
             groupBoxLog.Location = new Point(12, 243);
             groupBoxLog.Name = "groupBoxLog";
@@ -259,16 +290,38 @@
             groupBoxLog.TabStop = false;
             groupBoxLog.Text = "Log";
             // 
+            // contextMenuLog
+            // 
+            contextMenuLog.ImageScalingSize = new Size(24, 24);
+            contextMenuLog.Items.AddRange(new ToolStripItem[] { saveLogMenuItem, clearLogMenuItem });
+            contextMenuLog.Name = "contextMenuLog";
+            contextMenuLog.Size = new Size(187, 68);
+            // 
+            // clearLogMenuItem
+            // 
+            clearLogMenuItem.Name = "clearLogMenuItem";
+            clearLogMenuItem.Size = new Size(240, 32);
+            clearLogMenuItem.Text = "Clear log";
+            clearLogMenuItem.Click += ClearLogMenuItem_Click;
+            // 
+            // saveLogMenuItem
+            // 
+            saveLogMenuItem.Name = "saveLogMenuItem";
+            saveLogMenuItem.Size = new Size(240, 32);
+            saveLogMenuItem.Text = "Save log as...";
+            saveLogMenuItem.Click += SaveLogMenuItem_Click;
+            // 
             // richTextBoxLog
             // 
             richTextBoxLog.BorderStyle = BorderStyle.None;
+            richTextBoxLog.ContextMenuStrip = contextMenuLog;
             richTextBoxLog.Location = new Point(6, 30);
             richTextBoxLog.Name = "richTextBoxLog";
             richTextBoxLog.ReadOnly = true;
             richTextBoxLog.Size = new Size(582, 178);
             richTextBoxLog.TabIndex = 0;
             richTextBoxLog.Text = "";
-            richTextBoxLog.TextChanged += LogTextChanged;
+            richTextBoxLog.TextChanged += LogText_TextChanged;
             // 
             // checkBoxHideWindow
             // 
@@ -290,7 +343,7 @@
             buttonStart.Text = "Start";
             toolTip.SetToolTip(buttonStart, "Start capturing with selected interval");
             buttonStart.UseVisualStyleBackColor = true;
-            buttonStart.Click += StartBtnClick;
+            buttonStart.Click += StartBtn_Click;
             // 
             // buttonStop
             // 
@@ -302,7 +355,7 @@
             buttonStop.Text = "Stop";
             toolTip.SetToolTip(buttonStop, "Stop capturing");
             buttonStop.UseVisualStyleBackColor = true;
-            buttonStop.Click += StopBtnClick;
+            buttonStop.Click += StopBtn_Click;
             // 
             // buttonOpenFolder
             // 
@@ -313,7 +366,7 @@
             buttonOpenFolder.Text = "Open folder";
             toolTip.SetToolTip(buttonOpenFolder, "Open output folder");
             buttonOpenFolder.UseVisualStyleBackColor = true;
-            buttonOpenFolder.Click += OpenFolderBtnClick;
+            buttonOpenFolder.Click += OpenFolderBtn_Click;
             // 
             // buttonShot
             // 
@@ -324,7 +377,7 @@
             buttonShot.Text = "Shot";
             toolTip.SetToolTip(buttonShot, "Take single screenshot");
             buttonShot.UseVisualStyleBackColor = true;
-            buttonShot.Click += ShotBtnClick;
+            buttonShot.Click += ShotBtn_Click;
             // 
             // MainForm
             // 
@@ -348,9 +401,11 @@
             Load += MainForm_Load;
             groupBoxOptions.ResumeLayout(false);
             groupBoxOptions.PerformLayout();
+            contextMenuOptions.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)numericInterval).EndInit();
             ((System.ComponentModel.ISupportInitialize)numericQuality).EndInit();
             groupBoxLog.ResumeLayout(false);
+            contextMenuLog.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -367,7 +422,7 @@
         private Label labelSeconds;
         private NumericUpDown numericInterval;
         private NumericUpDown numericQuality;
-        private ComboBox comboBoxFormat;
+        private ComboBox comboBoxType;
         private TextBox textBoxName;
         private Button buttonBrowse;
         private TextBox textBoxPath;
@@ -383,5 +438,11 @@
         private Button buttonResetArea;
         private TextBox textBoxArea;
         private Button buttonShot;
+        private ContextMenuStrip contextMenuOptions;
+        private ToolStripMenuItem resetOptionsMenuItem;
+        private ContextMenuStrip contextMenuLog;
+        private ToolStripMenuItem clearLogMenuItem;
+        private ToolStripMenuItem resetCounterMenuItem;
+        private ToolStripMenuItem saveLogMenuItem;
     }
 }
